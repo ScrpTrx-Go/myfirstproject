@@ -16,8 +16,8 @@ type App struct { // приложение состоит из:
 
 func NewApp(f PostFetcher, l Logger) *App {
 	return &App{
-		fetcher:  f,
-		analyzer: &MockAnalyzer{},
+		fetcher: f,
+		// analyzer: &MockAnalyzer{},
 		reporter: &MockReporter{},
 		log:      l,
 	}

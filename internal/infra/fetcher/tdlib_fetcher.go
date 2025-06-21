@@ -73,7 +73,7 @@ func (f *TDLibFetcher) Fetch(ctx context.Context, from, to time.Time) <-chan mod
 func (f *TDLibFetcher) RunPipeline(ctx context.Context, chatID int64, from, to time.Time) (<-chan model.Post, <-chan error) {
 	const numWorkers = 5
 
-	rawOut := make(chan RawMessage)
+	rawOut := make(chan *client.Message)
 	postOut := make(chan model.Post)
 	errCh := make(chan error, 1)
 
@@ -137,9 +137,8 @@ func (f *TDLibFetcher) FindChat(username string) (int64, error) {
 
 }
 
-func (f *TDLibFetcher) GetHistoryByPeriod(ctx context.Context, chatID int64, from, to time.Time, out chan<- RawMessage) error {
+func (f *TDLibFetcher) GetHistoryByPeriod(ctx context.Context, chatID int64, from, to time.Time, out chan<- *client.Message) error {
 	var fromMessageID int64
-	var postID int64
 	stop := false
 
 	for {
@@ -174,12 +173,11 @@ func (f *TDLibFetcher) GetHistoryByPeriod(ctx context.Context, chatID int64, fro
 				stop = true
 				break
 			}
-			postID++
 			select {
 			case <-ctx.Done():
 				f.log.Info("Producer context cancelled")
 				return nil
-			case out <- RawMessage{PostID: postID, Msg: msg}:
+			case out <- msg:
 			}
 		}
 
@@ -187,14 +185,8 @@ func (f *TDLibFetcher) GetHistoryByPeriod(ctx context.Context, chatID int64, fro
 	}
 }
 
-// необработанный тип сообщения, который GetHistory будет отдавать воркерам в работу
-type RawMessage struct {
-	PostID int64
-	Msg    *client.Message
-}
-
-func (f *TDLibFetcher) ValidateMessage(raw RawMessage) (model.Post, bool) {
-	msg := raw.Msg
+func (f *TDLibFetcher) ValidateMessage(raw *client.Message) (model.Post, bool) {
+	msg := raw
 	var text string
 
 	switch content := msg.Content.(type) {
@@ -215,7 +207,6 @@ func (f *TDLibFetcher) ValidateMessage(raw RawMessage) (model.Post, bool) {
 	}
 
 	return model.Post{
-		ID:        raw.PostID,
 		Text:      text,
 		Timestamp: time.Unix(int64(msg.Date), 0),
 	}, true
